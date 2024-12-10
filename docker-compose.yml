@@ -1,13 +1,18 @@
 version: '3'
 
 services:
+  # =======================
+  # NATS Server
+  # =======================
   nats-server:
     image: nats:latest
     ports:
       # - 4222:4222
       - 8222:8222
       # - 6222:6222
-
+  # =======================
+  # CLIENT GATEWAY
+  # =======================
   client-gateway:
     build: ./client-gateway
     ports:
@@ -18,6 +23,9 @@ services:
     environment:
       - PORT=3000
       - NATS_SERVERS=nats://nats-server:4222
+  # =======================
+  # PRODUCTS Microservice
+  # =======================
   products-ms:
     build: ./products-ms
     volumes:
@@ -31,7 +39,6 @@ services:
   # =======================
   # ORDERS Microservice
   # =======================
-
   orders-ms:
     depends_on:
       - orders-db
@@ -72,4 +79,18 @@ services:
       - STRIPE_SUCCESS_URL=${STRIPE_SUCCESS_URL}
       - STRIPE_CANCEL_URL=${STRIPE_CANCEL_URL}
       - STRIPE_ENDPOINT_SECRET=${STRIPE_ENDPOINT_SECRET}
+    command: npm run start:dev
+  # =======================
+  # AUTH Microservice
+  # =======================
+  auth-ms:
+    container_name: auth-ms
+    build: ./auth-ms
+    volumes:
+      - ./auth-ms/src:/usr/src/app/src
+    environment:
+      - PORT=3004
+      - NATS_SERVERS=nats://nats-server:4222
+      - DATABASE_URL=${AUTH_DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
     command: npm run start:dev
