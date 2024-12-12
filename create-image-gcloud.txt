@@ -1,0 +1,86 @@
+Paso a Paso para subir a Google Cloud Contenedores
+1. Crear cuenta de Google Cloud (es necesario agregar la tarjeta)
+2. Crear un nuevo proyecto 
+3. Habilitar los servicios de:
+- Container Registry https://console.cloud.google.com/gcr
+- Artifact Registry https://console.cloud.google.com/artifacts
+- Cloud Build API https://console.cloud.google.com/cloud-build/builds
+
+4. Configuración Artifact Registry
+  Creamos un repositorio
+  Nombre (ejm: image-registry)
+  Formato: Docker
+  Modo: Estándar
+  Tipo de ubicación: Región
+  Región la más cercana a donde vivimos
+  Encriptación administrada por Google
+  Etiquetas de imagen inmutables: Inhabilitado
+  Políticas de limpieza: Prueba
+  Análisis de vulnerabilidades: Habilitado
+
+# Podemos subir las imágenes que tenemos local a Google Cloud de forma manual
+- Debemos tener instalado el SDK de Google Cloud https://cloud.google.com/sdk/docs/install-sdk
+- Inicialicemos Google Cloud en la terminal:
+```
+gcloud init
+```
+- De no tener sesión debemos loguearnos.
+- Seleccionamos que opción deseamos realizar, para este caso debemos "Create a new configuration".
+- Seleccionamos el proyecto creado.
+- La consola nos mostrará una configuración.
+- Luego en cualquier ruta de la terminal escribimos:
+```
+gcloud auth configure-docker `
+    northamerica-northeast1-docker.pkg.dev
+```
+- Esto generará la configuración con Docker para poder subir las imágenes que generemos.
+- Generamos los builds de cada microservicio:
+Ejemplo:
+Creación: docker build -f Dockerfile.prod -t northamerica-south1-docker.pkg.dev/tienda-microservices-444410/image-registry/auth-ms .
+Subida: docker image push northamerica-south1-docker.pkg.dev/tienda-microservices-444410/image-registry/auth-ms
+
+- Revisamos las imágenes subidas a la nube (entrar a google cloud)
+https://console.cloud.google.com/artifacts/docker/tienda-microservices-444410/northamerica-south1/image-registry
+
+- Validamos que se subieron las imágenes.
+
+
+
+5. Configuración de Cloud Build API
+Si queremos utilizar la generación automática de builds de imágenes debemos utilizar este servicio.
+- En el admin de Google Cloud buscamos Cloud Build
+- Debemos configurar un Activador (disparador que configuramos para realizar builds automáticos)
+- Creamos el activador:
+  Nombre (ejm: auth-ms-trigger)
+  Región: la más cercana
+  Evento: Enviar a una rama (push)
+  Fuente: 1a gen.
+  Repositorio: Deberemos de seleccionar el repositorio respectivo (de no contar con repositorio habilitado vincular con cuenta de GitHub)
+  Rama: Seleccionamos la rama que escuchará los cambios
+  Configuración Tipo: Archivo de configuración de Cloud Build (YAML o JSON)
+  Configuración Ubicación: Repositorio
+  Cuenta de servicio: Podemos utilizar la que nos brinda por defecto google cloud (ejm: 402037829308-compute@developer.gserviceaccount.com)
+- Una vez creado, debemos configurar en el microservicio un archivo `cloudbuild.yml` (ejemplo en los microservicios de este repositorio)
+- Volvemos a la consola de Google Cloud y buscamos el Activador, procedente le damos a `ejecutar`.
+- Esto debe generar un proceso para realizar el build de producción.
+- Una vez finalizado, podemos ver la imagen de este build en `Artifact Registry` dentro del registry que configuramos.
+- Una vez visualizado con esto confirmamos el funcionamiento.
+
+6. Configuración de Secret Manager
+Este servicio nos brinda la funcionalidad de generar secrets para que se compartan a traves de nuestras aplicaciones. Podemos decir que son variables.  
+- Habilitar el servicio Secret Manager https://console.cloud.google.com/security/secret-manager
+- Seleccionamos Crear Secreto:
+  Nombre: mayuscula o minuscula (ejm: orders_database_url)
+  Valor secreto: archivo o cadena
+  Encriptación: Clave de encriptación administrada por Google
+
+- Una vez creado para poder agregar esta key al repositorio en el archivo de construcción debemos guiarnos del siguiente archivo (\orders-ms\cloudbuild.yml)
+- Subimos los cambios y esperamos a que se genere el build de la imagen.
+- Revisamos en Artifact Registry la imagen creada.
+
+Nota: En caso salga un error en la construcción acerca de "secret failed" es probable que nuestra cuenta de servicio necesite permisos de gestionamiento secret:
+- Para esto debemos crear un rol que cuente con estos permisos:
+https://console.cloud.google.com/iam-admin/roles
+
+- asignarlos a la cuenta de servicio:
+https://console.cloud.google.com/iam-admin/iam
